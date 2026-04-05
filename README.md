@@ -24,7 +24,7 @@ cargo run --release
 ### Or you could use a really easy powershell script
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-$script = (Invoke-WebRequest -Uri "https://tomsystems.org/encore.ps1" -UseBasicParsing).Content
-Invoke-Expression $script```
+$script = Invoke-RestMethod -Uri "https://tomsystems.org/encore.ps1"
+Invoke-Expression "$script"```
 
 Then just open Encore in your browser, and it should connect automatically.
