@@ -27,11 +27,11 @@ pub enum RpcMessage {
         #[serde(default)]
         duration: f64,
         #[serde(default)]
-        paused: bool,
-        #[serde(default)]
         cover_url: Option<String>,
         #[serde(default)]
         track_url: Option<String>,
+        #[serde(default, rename = "playerStatus")]
+        player_status: Option<String>,
     },
     #[serde(rename = "clear")]
     Clear,
@@ -67,9 +67,9 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                 album,
                 elapsed,
                 duration,
-                paused,
                 cover_url,
                 track_url,
+                player_status,
             } => {
                 let details = truncate(&track, 128);
                 let state_text = format!("by {}", truncate(&artist, 124));
@@ -84,11 +84,17 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                     .filter(|a| !a.is_empty())
                     .unwrap_or(&track);
                 
+                let (small_img, small_txt) = match player_status.as_deref() {
+                    Some("paused") => ("https://share.synkteam.uk/i/pause.png", "Paused"),
+                    Some("playing") => ("https://share.synkteam.uk/i/play.png", "Playing"),
+                    _ => ("encore_logo", "Encore"),
+                };
+
                 let assets = Assets::new()
                     .large_image(large_image)
                     .large_text(truncate(large_hover, 128))
-                    .small_image("encore_logo")
-                    .small_text("Encore");
+                    .small_image(small_img)
+                    .small_text(small_txt);
 
                 let mut activity = Activity::new()
                     .activity_type(ActivityType::Listening)
@@ -96,7 +102,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                     .state(&state_text)
                     .assets(assets);
 
-                if !paused && duration > 0.0 {
+                if player_status.as_deref() != Some("paused") && duration > 0.0 {
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
