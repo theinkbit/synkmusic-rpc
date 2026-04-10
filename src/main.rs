@@ -9,13 +9,17 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_tungstenite::accept_async;
 
-const APP_ID: &str = "1489549668810493993";
-const PORT: u16 = 19836;
-const ENCORE_URL: &str = "https://encore.synkteam.uk";
+const DISCORD_APP_ID: &str = "1489549668810493993";
+const WS_PORT: u16 = 19836;
+const SYNKMUSIC_URL: &str = "https://synkmusic.synkteam.uk";
+
+const ICON_PAUSE: &str = "https://share.synkteam.uk/i/pause.png";
+const ICON_PLAY: &str = "https://share.synkteam.uk/i/play.png";
+const LOGO_ASSET: &str = "synkmusic_logo";
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-pub enum RpcMessage {
+enum RpcMessage {
     #[serde(rename = "update")]
     Update {
         track: String,
@@ -46,16 +50,17 @@ fn truncate(s: &str, max: usize) -> &str {
 }
 
 fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
-    let mut client = DiscordIpcClient::new(APP_ID).expect("Failed to create IPC client");
+    let mut client =
+        DiscordIpcClient::new(DISCORD_APP_ID).expect("failed to create Discord IPC client");
     let mut connected = false;
 
     while let Some(msg) = rx.blocking_recv() {
         if !connected {
             if client.connect().is_ok() {
                 connected = true;
-                println!("[encore-rpc] Connected to Discord IPC");
+                println!("[synkmusic-rpc] Connected to Discord IPC");
             } else {
-                eprintln!("[encore-rpc] Failed to connect to Discord. Retrying next update...");
+                eprintln!("[synkmusic-rpc] Discord not available, retrying on next update");
                 continue;
             }
         }
@@ -77,17 +82,17 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                 let large_image = cover_url
                     .as_deref()
                     .filter(|u| !u.is_empty())
-                    .unwrap_or("encore_logo");
+                    .unwrap_or(LOGO_ASSET);
 
                 let large_hover = album
                     .as_deref()
                     .filter(|a| !a.is_empty())
                     .unwrap_or(&track);
-                
+
                 let (small_img, small_txt) = match player_status.as_deref() {
-                    Some("paused") => ("https://share.synkteam.uk/i/pause.png", "Paused"),
-                    Some("playing") => ("https://share.synkteam.uk/i/play.png", "Playing"),
-                    _ => ("encore_logo", "Encore"),
+                    Some("paused") => (ICON_PAUSE, "Paused"),
+                    Some("playing") => (ICON_PLAY, "Playing"),
+                    _ => (LOGO_ASSET, "SynkMusic"),
                 };
 
                 let assets = Assets::new()
@@ -113,11 +118,14 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                 }
 
                 let mut buttons = Vec::new();
-                if let Some(url) = track_url.as_deref().filter(|u| !u.is_empty() && u.len() <= 512) {
-                    buttons.push(Button::new("Listen on Encore", url));
+                if let Some(url) =
+                    track_url
+                        .as_deref()
+                        .filter(|u| !u.is_empty() && u.len() <= 512)
+                {
+                    buttons.push(Button::new("Listen on SynkMusic", url));
                 }
-                buttons.push(Button::new("Open Encore", ENCORE_URL));
-
+                buttons.push(Button::new("Open SynkMusic", SYNKMUSIC_URL));
                 activity = activity.buttons(buttons);
 
                 if client.set_activity(activity).is_err() {
@@ -137,44 +145,41 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== Encore Discord RPC v1.0 ===");
-    println!("NOTE: This is a WIP, expect bugs and occasional issues.");
-    println!("Listening on ws://127.0.0.1:{}", PORT);
+    println!("[synkmusic-rpc] Listening on ws://127.0.0.1:{WS_PORT}");
 
     let (tx, rx) = mpsc::channel(32);
-
     std::thread::spawn(move || discord_ipc_loop(rx));
 
-    let listener = TcpListener::bind(("127.0.0.1", PORT)).await?;
+    let listener = TcpListener::bind(("127.0.0.1", WS_PORT)).await?;
 
     loop {
         let (stream, addr) = match listener.accept().await {
-            Ok(res) => res,
+            Ok(conn) => conn,
             Err(e) => {
-                eprintln!("[encore-rpc] Accept error: {}", e);
+                eprintln!("[synkmusic-rpc] Accept error: {e}");
                 continue;
             }
         };
 
-        println!("[encore-rpc] Connection from {}", addr);
+        println!("[synkmusic-rpc] Connection from {addr}");
         let tx = tx.clone();
 
         tokio::spawn(async move {
-            let ws_stream = match accept_async(stream).await {
+            let ws = match accept_async(stream).await {
                 Ok(ws) => ws,
                 Err(e) => {
-                    eprintln!("[encore-rpc] WS handshake failed: {}", e);
+                    eprintln!("[synkmusic-rpc] WebSocket handshake failed: {e}");
                     return;
                 }
             };
 
-            let (_, mut read) = ws_stream.split();
+            let (_, mut read) = ws.split();
 
             while let Some(Ok(msg)) = read.next().await {
                 if msg.is_text() {
                     if let Ok(text) = msg.into_text() {
-                        if let Ok(rpc_msg) = serde_json::from_str::<RpcMessage>(&text) {
-                            let _ = tx.send(rpc_msg).await;
+                        if let Ok(rpc) = serde_json::from_str::<RpcMessage>(&text) {
+                            let _ = tx.send(rpc).await;
                         }
                     }
                 } else if msg.is_close() {
@@ -182,7 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            println!("[encore-rpc] Disconnected: {}", addr);
+            println!("[synkmusic-rpc] Disconnected: {addr}");
             let _ = tx.send(RpcMessage::Clear).await;
         });
     }
