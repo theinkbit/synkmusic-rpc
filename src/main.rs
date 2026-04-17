@@ -83,6 +83,7 @@ fn try_connect(client: &mut DiscordIpcClient) -> bool {
 fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
     let mut client = DiscordIpcClient::new(APP_ID).expect("Failed to create IPC client");
     let mut connected = false;
+    let mut last_update: Option<(String, String, Option<String>)> = None;
 
     while let Some(msg) = rx.blocking_recv() {
         if !connected {
@@ -104,6 +105,12 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                 player_status,
             } => {
                 let is_paused = player_status.as_deref() == Some("paused");
+                let key = (track.clone(), artist.clone(), player_status.clone());
+
+                if last_update.as_ref() == Some(&key) {
+                    continue;
+                }
+                last_update = Some(key);
 
                 let details = truncate(&track, 128);
 
@@ -172,6 +179,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>) {
                 }
             }
             RpcMessage::Clear => {
+                last_update = None;
                 if client.clear_activity().is_err() {
                     connected = false;
                 }
