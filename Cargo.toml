@@ -6,7 +6,7 @@ description = "SYNK Music RPC - allows the website to display what you're curren
 
 [dependencies]
 discord-rich-presence = "0.2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 serde = { version = "1", features = ["derive"] }
