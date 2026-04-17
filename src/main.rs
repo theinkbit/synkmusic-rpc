@@ -1,18 +1,27 @@
+use clap::Parser;
 use discord_rich_presence::{
     activity::{Activity, ActivityType, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
 };
 use futures_util::StreamExt;
 use serde::Deserialize;
+use std::net::TcpStream;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_tungstenite::accept_async;
 
 const APP_ID: &str = "1489549668810493993";
-const PORT: u16 = 19836;
+const DEFAULT_PORT: u16 = 19836;
 const SYNKMUSIC_URL: &str = "https://synkmusic.com";
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
+
+#[derive(Parser)]
+#[command(name = "synkmusic-rpc", about = "SYNK Music Discord RPC")]
+struct Args {
+    #[arg(short, long, default_value_t = DEFAULT_PORT, help = "Port to listen on")]
+    port: u16,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -181,22 +190,33 @@ fn wait_for_enter() {
 
 #[tokio::main]
 async fn main() {
-    if let Err(e) = run().await {
+    let args = Args::parse();
+    if let Err(e) = run(args.port).await {
         eprintln!("[synkmusic-rpc] Fatal error: {}", e);
         wait_for_enter();
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
+async fn run(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     println!("=== SYNK Music Discord RPC v1.0 ===");
     println!("NOTE: This is a WIP, expect bugs and occasional issues.");
-    println!("Listening on ws://127.0.0.1:{}", PORT);
+
+    if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+        return Err(format!(
+            "Port {} is already in use. Is another instance running?\n\
+             Try a different port with: synkmusic-rpc -p <port>",
+            port
+        )
+        .into());
+    }
+
+    println!("Listening on ws://127.0.0.1:{}", port);
 
     let (tx, rx) = mpsc::channel(32);
 
     std::thread::spawn(move || discord_ipc_loop(rx));
 
-    let listener = TcpListener::bind(("127.0.0.1", PORT)).await?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).await?;
 
     let accept_loop = async {
         loop {

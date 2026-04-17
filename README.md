@@ -34,6 +34,21 @@ Head over to the [Releases](../../releases) page and grab the latest `.exe`. No 
 3. Run the RPC tool (however you installed it).
 4. That's it, your Discord status should update automatically.
 
+### Custom port
+If port 19836 is already in use, you can change it:
+```bash
+synkmusic-rpc -p 19837
+```
+If you change the port here, you'll also need to change the default websocket port on the website. Go to **Profile Picture > Settings > Privacy and Social > RPC Websocket Port** and set it to the same port.
+
+## FAQ
+
+### Is this a virus?
+No. If you don't believe us then you can check the source code for yourselves, it's all right here. You can also build it yourself on your own computer if you want to be 100% sure. See the [build from source](#1-build-it-from-source-recommended) section above.
+
+### Why isn't my status showing on Discord?
+Make sure you've got Activity Status enabled in Discord. Go to **Settings > Activity Privacy** and turn on **"Share your activity status"**. Also make sure Discord is actually running before you start the RPC, it can't update your status if there's nothing to connect to.
+
 ## Contributing
 PRs are welcome. The codebase is pretty small so it shouldn't be too hard to find your way around. If you're planning something big, open an issue first so we can talk about it before you sink time into it.
 
