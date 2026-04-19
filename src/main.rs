@@ -343,6 +343,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
     let ipc_path_ref: Option<&str> = None;
     let mut client: Option<DiscordIpc> = None;
     let mut last_update: Option<(String, String, Option<String>)> = None;
+    let mut last_update_time = std::time::Instant::now() - Duration::from_secs(60);
 
     while let Some(msg) = rx.blocking_recv() {
         if client.is_none() {
@@ -366,10 +367,13 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                 let is_paused = player_status.as_deref() == Some("paused");
                 let key = (track.clone(), artist.clone(), player_status.clone());
 
-                if last_update.as_ref() == Some(&key) {
+                let dominated = last_update.as_ref() == Some(&key)
+                    && last_update_time.elapsed() < Duration::from_secs(5);
+                if dominated {
                     continue;
                 }
                 last_update = Some(key);
+                last_update_time = std::time::Instant::now();
 
                 let details = truncate(&track, 128);
 
