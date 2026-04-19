@@ -3,7 +3,7 @@ This is a simple tool that connects SYNK Music to your Discord profile, so your 
 ## Status
 WIP - honestly it's pretty new, so there are probably some bugs. If it breaks, it breaks. Make a issue on here if you feel like it's a serious issue, or make a PR if you think you can fix it.
 ## How do I get the SYNK Music RPC?
-At the moment we have 2 ways of getting the SYNK Music RPC.
+At the moment there's 2 ways of getting the SYNK Music RPC.
 ## 1: Build it from source (recommended)
 ### 1. Get Rust
 You need Rust on your machine to run this. Just run this in your terminal:
@@ -20,7 +20,7 @@ cargo run --release
 ### Or you could use a really easy powershell script
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
-$script = Invoke-RestMethod -Uri "https://encore.synkteam.uk/build.ps1"
+$script = Invoke-RestMethod -Uri "https://apps.synkmusic.com/misc/build.ps1"
 Invoke-Expression "$script"
 ```
 Then just open SYNK Music in your browser, and it should connect automatically.
