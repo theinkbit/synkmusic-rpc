@@ -4,7 +4,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_repr::Serialize_repr;
 use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -217,6 +216,9 @@ impl DiscordIpc {
         let mut header = [0u8; 8];
         self.socket.read_exact(&mut header)?;
         let len = u32::from_le_bytes(header[4..8].try_into()?) as usize;
+        if len > 64 * 1024 {
+            return Err(format!("IPC frame too large ({len} bytes)").into());
+        }
         let mut buf = vec![0u8; len];
         self.socket.read_exact(&mut buf)?;
         let val = serde_json::from_slice(&buf)?;
@@ -406,7 +408,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                     small_text: Some(small_txt),
                 };
 
-                let timestamps = if !is_paused && duration > 0.0 {
+                let timestamps = if !is_paused && duration > 0.0 && elapsed >= 0.0 && elapsed.is_finite() && duration.is_finite() {
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
@@ -444,8 +446,8 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                 };
 
                 if let Some(ref mut c) = client {
-                    if c.set_activity(activity).is_err() {
-                        eprintln!("[synkmusic-rpc] Lost Discord connection, will reconnect");
+                    if let Err(e) = c.set_activity(activity) {
+                        eprintln!("[synkmusic-rpc] Lost Discord connection ({}), will reconnect", e);
                         client = None;
                     }
                 }
@@ -453,7 +455,8 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
             RpcMessage::Clear => {
                 last_update = None;
                 if let Some(ref mut c) = client {
-                    if c.clear_activity().is_err() {
+                    if let Err(e) = c.clear_activity() {
+                        eprintln!("[synkmusic-rpc] Lost Discord connection ({}), will reconnect", e);
                         client = None;
                     }
                 }
@@ -491,22 +494,24 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
     println!("=== SYNK Music Discord RPC v1.0 ===");
     println!("NOTE: This is a WIP, expect bugs and occasional issues.");
 
-    if TcpStream::connect(("127.0.0.1", port)).is_ok() {
-        return Err(format!(
-            "Port {} is already in use. Is another instance running?\n\
-             Try a different port with: synkmusic-rpc -p <port>",
-            port
-        )
-        .into());
-    }
+    let listener = match TcpListener::bind(("127.0.0.1", port)).await {
+        Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            return Err(format!(
+                "Port {} is already in use. Is another instance running?\n\
+                 Try a different port with: synkmusic-rpc -p <port>",
+                port
+            )
+            .into());
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     println!("Listening on ws://127.0.0.1:{}", port);
 
     let (tx, rx) = mpsc::channel(32);
 
     std::thread::spawn(move || discord_ipc_loop(rx, ipc_path));
-
-    let listener = TcpListener::bind(("127.0.0.1", port)).await?;
 
     let accept_loop = async {
         loop {
@@ -532,20 +537,41 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
 
                 let (_, mut read) = ws_stream.split();
 
-                while let Some(Ok(msg)) = read.next().await {
-                    if msg.is_text() {
-                        if let Ok(text) = msg.into_text() {
-                            match serde_json::from_str::<RpcMessage>(&text) {
-                                Ok(rpc_msg) => {
-                                    let _ = tx.send(rpc_msg).await;
-                                }
-                                Err(e) => {
-                                    eprintln!("[synkmusic-rpc] Bad message from {}: {}", addr, e);
-                                }
+                while let Some(result) = read.next().await {
+                    let msg = match result {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            eprintln!("[synkmusic-rpc] WS read error from {}: {}", addr, e);
+                            break;
+                        }
+                    };
+
+                    if msg.is_close() {
+                        break;
+                    }
+
+                    if !msg.is_text() {
+                        continue;
+                    }
+
+                    let text = match msg.into_text() {
+                        Ok(t) => t,
+                        Err(e) => {
+                            eprintln!("[synkmusic-rpc] Invalid text frame from {}: {}", addr, e);
+                            continue;
+                        }
+                    };
+
+                    match serde_json::from_str::<RpcMessage>(&text) {
+                        Ok(rpc_msg) => {
+                            if tx.send(rpc_msg).await.is_err() {
+                                eprintln!("[synkmusic-rpc] IPC channel closed, dropping connection from {}", addr);
+                                break;
                             }
                         }
-                    } else if msg.is_close() {
-                        break;
+                        Err(e) => {
+                            eprintln!("[synkmusic-rpc] Bad message from {}: {}", addr, e);
+                        }
                     }
                 }
 
