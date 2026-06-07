@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 const APP_ID: &str = "1489549668810493993";
 const DEFAULT_PORT: u16 = 19836;
-const SYNKMUSIC_URL: &str = "https://synkmusic.com";
+const ENCORE_URL: &str = "https://encore.mimso.co.uk";
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 
 #[cfg(unix)]
@@ -26,7 +26,7 @@ const KNOWN_SUBPATHS: &[&str] = &[
 ];
 
 #[derive(Parser)]
-#[command(name = "synkmusic-rpc", about = "SYNK Music Discord RPC")]
+#[command(name = "encore-rpc", about = "Encore Discord RPC")]
 struct Args {
     #[arg(short, long, default_value_t = DEFAULT_PORT, help = "Port to listen on")]
     port: u16,
@@ -95,7 +95,7 @@ impl DiscordIpc {
                 for i in 0..10 {
                     let path = Path::new(base).join(subpath).join(format!("discord-ipc-{i}"));
                     if let Ok(stream) = UnixStream::connect(&path) {
-                        println!("[synkmusic-rpc] Found IPC socket: {}", path.display());
+                        println!("[encore-rpc] Found IPC socket: {}", path.display());
                         return Ok(stream);
                     }
                 }
@@ -108,7 +108,7 @@ impl DiscordIpc {
                     for i in 0..10 {
                         let path = xdg_run.join(format!("discord-ipc-{i}"));
                         if let Ok(stream) = UnixStream::connect(&path) {
-                            println!("[synkmusic-rpc] Found IPC socket: {}", path.display());
+                            println!("[encore-rpc] Found IPC socket: {}", path.display());
                             return Ok(stream);
                         }
                     }
@@ -124,7 +124,7 @@ impl DiscordIpc {
                     for i in 0..10 {
                         let path = entry.path().join(format!("discord-ipc-{i}"));
                         if let Ok(stream) = UnixStream::connect(&path) {
-                            println!("[synkmusic-rpc] Found IPC socket: {}", path.display());
+                            println!("[encore-rpc] Found IPC socket: {}", path.display());
                             return Ok(stream);
                         }
                     }
@@ -171,7 +171,7 @@ impl DiscordIpc {
         for i in 0..10 {
             let path = PathBuf::from(format!(r"\\.\pipe\discord-ipc-{}", i));
             if let Ok(handle) = OpenOptions::new().read(true).write(true).access_mode(0x3).open(&path) {
-                println!("[synkmusic-rpc] Found IPC pipe: {}", path.display());
+                println!("[encore-rpc] Found IPC pipe: {}", path.display());
                 let mut client = Self { socket: handle };
                 client.handshake()?;
                 return Ok(client);
@@ -318,12 +318,12 @@ fn try_connect(ipc_path: Option<&str>) -> Option<DiscordIpc> {
     for _ in 0..5 {
         match DiscordIpc::connect(ipc_path) {
             Ok(client) => {
-                println!("[synkmusic-rpc] Connected to Discord IPC");
+                println!("[encore-rpc] Connected to Discord IPC");
                 return Some(client);
             }
             Err(e) => {
                 eprintln!(
-                    "[synkmusic-rpc] Failed to connect to Discord ({}). Retrying in {}s...",
+                    "[encore-rpc] Failed to connect to Discord ({}). Retrying in {}s...",
                     e,
                     delay.as_secs()
                 );
@@ -332,7 +332,7 @@ fn try_connect(ipc_path: Option<&str>) -> Option<DiscordIpc> {
             }
         }
     }
-    eprintln!("[synkmusic-rpc] Could not connect after retries, will try again on next update");
+    eprintln!("[encore-rpc] Could not connect after retries, will try again on next update");
     None
 }
 
@@ -392,7 +392,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                 let large_image = cover_url
                     .as_deref()
                     .filter(|u| !u.is_empty())
-                    .unwrap_or("synkmusic_logo");
+                    .unwrap_or("encore_logo");
 
                 let large_hover = album
                     .as_deref()
@@ -400,9 +400,9 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                     .unwrap_or(&track);
 
                 let (small_img, small_txt) = match player_status.as_deref() {
-                    Some("paused") => ("https://share.synkteam.uk/i/pause.png", "Paused"),
-                    Some("playing") => ("https://share.synkteam.uk/i/play.png", "Playing"),
-                    _ => ("synkmusic_logo", "SYNK Music"),
+                    Some("paused") => ("https://encore-assets.mimso.co.uk/i/pause.png", "Paused"),
+                    Some("playing") => ("https://encore-assets.mimso.co.uk/i/play.png", "Playing"),
+                    _ => ("encore_logo", "Encore"),
                 };
 
                 let assets = Assets {
@@ -431,13 +431,13 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                 if let Some(url) = track_url.as_deref().filter(|u| !u.is_empty() && u.len() <= 512)
                 {
                     buttons.push(Button {
-                        label: "Listen on SYNK Music",
+                        label: "Listen on Encore",
                         url,
                     });
                 }
                 buttons.push(Button {
-                    label: "Open SYNK Music",
-                    url: SYNKMUSIC_URL,
+                    label: "Open Encore",
+                    url: ENCORE_URL,
                 });
 
                 let activity = Activity {
@@ -451,7 +451,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
 
                 if let Some(ref mut c) = client {
                     if let Err(e) = c.set_activity(activity) {
-                        eprintln!("[synkmusic-rpc] Lost Discord connection ({}), will reconnect", e);
+                        eprintln!("[encore-rpc] Lost Discord connection ({}), will reconnect", e);
                         client = None;
                     }
                 }
@@ -460,7 +460,7 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                 last_update = None;
                 if let Some(ref mut c) = client {
                     if let Err(e) = c.clear_activity() {
-                        eprintln!("[synkmusic-rpc] Lost Discord connection ({}), will reconnect", e);
+                        eprintln!("[encore-rpc] Lost Discord connection ({}), will reconnect", e);
                         client = None;
                     }
                 }
@@ -489,13 +489,13 @@ async fn main() {
     let ipc_path: Option<String> = None;
 
     if let Err(e) = run(args.port, ipc_path).await {
-        eprintln!("[synkmusic-rpc] Fatal error: {}", e);
+        eprintln!("[encore-rpc] Fatal error: {}", e);
         wait_for_enter();
     }
 }
 
 async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== SYNK Music Discord RPC v1.0 ===");
+    println!("=== Encore Discord RPC v{} ===", env!("CARGO_PKG_VERSION"));
     println!("NOTE: This is a WIP, expect bugs and occasional issues.");
 
     let listener = match TcpListener::bind(("127.0.0.1", port)).await {
@@ -503,7 +503,7 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
             return Err(format!(
                 "Port {} is already in use. Is another instance running?\n\
-                 Try a different port with: synkmusic-rpc -p <port>",
+                 Try a different port with: encore-rpc -p <port>",
                 port
             )
             .into());
@@ -522,19 +522,19 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
             let (stream, addr) = match listener.accept().await {
                 Ok(res) => res,
                 Err(e) => {
-                    eprintln!("[synkmusic-rpc] Accept error: {}", e);
+                    eprintln!("[encore-rpc] Accept error: {}", e);
                     continue;
                 }
             };
 
-            println!("[synkmusic-rpc] Connection from {}", addr);
+            println!("[encore-rpc] Connection from {}", addr);
             let tx = tx.clone();
 
             tokio::spawn(async move {
                 let ws_stream = match accept_async(stream).await {
                     Ok(ws) => ws,
                     Err(e) => {
-                        eprintln!("[synkmusic-rpc] WS handshake failed: {}", e);
+                        eprintln!("[encore-rpc] WS handshake failed: {}", e);
                         return;
                     }
                 };
@@ -545,7 +545,7 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
                     let msg = match result {
                         Ok(msg) => msg,
                         Err(e) => {
-                            eprintln!("[synkmusic-rpc] WS read error from {}: {}", addr, e);
+                            eprintln!("[encore-rpc] WS read error from {}: {}", addr, e);
                             break;
                         }
                     };
@@ -561,7 +561,7 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
                     let text = match msg.into_text() {
                         Ok(t) => t,
                         Err(e) => {
-                            eprintln!("[synkmusic-rpc] Invalid text frame from {}: {}", addr, e);
+                            eprintln!("[encore-rpc] Invalid text frame from {}: {}", addr, e);
                             continue;
                         }
                     };
@@ -569,17 +569,17 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
                     match serde_json::from_str::<RpcMessage>(&text) {
                         Ok(rpc_msg) => {
                             if tx.send(rpc_msg).await.is_err() {
-                                eprintln!("[synkmusic-rpc] IPC channel closed, dropping connection from {}", addr);
+                                eprintln!("[encore-rpc] IPC channel closed, dropping connection from {}", addr);
                                 break;
                             }
                         }
                         Err(e) => {
-                            eprintln!("[synkmusic-rpc] Bad message from {}: {}", addr, e);
+                            eprintln!("[encore-rpc] Bad message from {}: {}", addr, e);
                         }
                     }
                 }
 
-                println!("[synkmusic-rpc] Disconnected: {}", addr);
+                println!("[encore-rpc] Disconnected: {}", addr);
                 let _ = tx.send(RpcMessage::Clear).await;
             });
         }
@@ -588,7 +588,7 @@ async fn run(port: u16, ipc_path: Option<String>) -> Result<(), Box<dyn std::err
     tokio::select! {
         _ = accept_loop => {}
         _ = tokio::signal::ctrl_c() => {
-            println!("\n[synkmusic-rpc] Shutting down, clearing Discord activity...");
+            println!("\n[encore-rpc] Shutting down, clearing Discord activity...");
             let _ = tx.send(RpcMessage::Clear).await;
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
