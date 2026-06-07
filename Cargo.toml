@@ -1,6 +1,6 @@
 [package]
 name = "encore-rpc"
-version = "1.0.0"
+version = "0.1.5"
 edition = "2021"
 description = "Encore RPC - allows the website to display what you're currently listening to on Discord"
 
