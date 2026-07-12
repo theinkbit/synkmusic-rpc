@@ -1,8 +1,8 @@
 [package]
-name = "encore-rpc"
-version = "0.1.5"
+name = "synkmusic-rpc"
+version = "0.1.6"
 edition = "2021"
-description = "Encore RPC - allows the website to display what you're currently listening to on Discord"
+description = "SYNK Music RPC - allows the website to display what you're currently listening to on Discord"
 
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }

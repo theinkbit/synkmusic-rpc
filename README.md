@@ -1,9 +1,9 @@
-# Encore Discord RPC
-This is a simple tool that connects Encore to your Discord profile, so your friends can see what you're listening to in real-time.
+# SYNK Music Discord RPC
+This is a simple tool that connects SYNK Music to your Discord profile, so your friends can see what you're listening to in real-time.
 ## Status
 WIP - honestly it's pretty new, so there are probably some bugs. If it breaks, it breaks. Make a issue on here if you feel like it's a serious issue, or make a PR if you think you can fix it.
-## How do I get the Encore RPC?
-At the moment there's 2 ways of getting the Encore RPC.
+## How do I get the SYNK Music RPC?
+At the moment there's 2 ways of getting the SYNK Music RPC.
 ## 1: Build it from source (recommended)
 ### 1. Get Rust
 You need Rust on your machine to run this. Just run this in your terminal:
@@ -17,21 +17,21 @@ Download the project, open the folder in your terminal, and run:
 ```bash
 cargo run --release
 ```
-Then just open Encore in your browser, and it should connect automatically.
+Then just open SYNK Music in your browser, and it should connect automatically.
 
 ## 2: Download the pre-compiled version from the releases.
 Head over to the [Releases](../../releases) page and grab the latest `.exe`. No Rust required, just download it, run it, and you're good to go.
 
 ## Usage
 1. Make sure Discord is open and running.
-2. Open [Encore](https://encore.mimso.co.uk) in your browser and start playing something.
+2. Open [SYNK Music](https://synkmusic.xyz) in your browser and start playing something.
 3. Run the RPC tool (however you installed it).
 4. That's it, your Discord status should update automatically.
 
 ### Custom port
 If port 19836 is already in use, you can change it:
 ```bash
-encore-rpc -p 19837
+synkmusic-rpc -p 19837
 ```
 If you change the port here, you'll also need to change the default websocket port on the website. Go to **Profile Picture > Settings > Privacy and Social > RPC Websocket Port** and set it to the same port.
 
