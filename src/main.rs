@@ -400,8 +400,8 @@ fn discord_ipc_loop(mut rx: mpsc::Receiver<RpcMessage>, _ipc_path: Option<String
                     .unwrap_or(&track);
 
                 let (small_img, small_txt) = match player_status.as_deref() {
-                    Some("paused") => ("https://synkmusic.xyz/rpc-assets/pause.svg", "Paused"),
-                    Some("playing") => ("https://synkmusic.xyz/rpc-assets/play.svg", "Playing"),
+                    Some("paused") => ("https://synkmusic.xyz/rpc-assets/pause.png", "Paused"),
+                    Some("playing") => ("https://synkmusic.xyz/rpc-assets/play.png", "Playing"),
                     _ => ("synkmusic_logo", "SYNK Music"),
                 };
 
